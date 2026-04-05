@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CareerConnect - Find the Right Job</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { fontFamily: { heading: ['Outfit','sans-serif'], body: ['DM Sans','sans-serif'] } } }
+        }
+    </script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        body { font-family: 'DM Sans', sans-serif; margin: 0; }
+        h1,h2,h3,h4 { font-family: 'Outfit', sans-serif; }
+        *:focus-visible { outline: 2px solid #059669; outline-offset: 2px; }
+        .toast-enter { animation: slideIn .3s ease forwards; }
+        .toast-exit { animation: slideOut .25s ease forwards; }
+        @keyframes slideIn { from { opacity:0; transform:translateX(100%); } to { opacity:1; transform:translateX(0); } }
+        @keyframes slideOut { from { opacity:1; transform:translateX(0); } to { opacity:0; transform:translateX(100%); } }
+        .modal-bg { animation: fadeIn .2s ease; }
+        .modal-box { animation: popIn .25s ease; }
+        @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+        @keyframes popIn { from { opacity:0; transform:scale(.95) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms!important; transition-duration: .01ms!important; } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback, createContext, useContext } = React;
+
+        // ── Data ──
+        const INITIAL_JOBS = [
+            { id:1, title:'Web Developer', company:'ABC Tech', location:'Remote', type:'Full Time', salary:'85,000 USD/yr', category:'Software & IT', desc:'Build modern web apps with React and Node.js. Work with a cross-functional team on feature development.', logo:'https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?w=60&h=60&fit=crop&crop=center', userAdded:false },
+            { id:2, title:'Marketing Specialist', company:'XYZ Corp', location:'New York', type:'Full Time', salary:'65,000 USD/yr', category:'Marketing & Sales', desc:'Run marketing campaigns, manage social media, and track performance analytics.', logo:'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=60&h=60&fit=crop&crop=center', userAdded:false },
+            { id:3, title:'Finance Analyst', company:'Finance Ltd', location:'Remote', type:'Part Time', salary:'45,000 USD/yr', category:'Finance & Accounting', desc:'Analyze financial data and prepare reports to support business decisions.', logo:'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=60&h=60&fit=crop&crop=center', userAdded:false },
+            { id:4, title:'Graphic Designer', company:'Creative Inc', location:'Los Angeles', type:'Full Time', salary:'55,000 USD/yr', category:'Design & Creative', desc:'Create visual content for digital and print. Keep brand consistency across materials.', logo:'https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=60&h=60&fit=crop&crop=center', userAdded:false },
+            { id:5, title:'HR Manager', company:'PeopleFirst Co', location:'Chicago', type:'Full Time', salary:'78,000 USD/yr', category:'HR & Administration', desc:'Lead recruitment, manage employee relations, and develop HR policies.', logo:'https://images.unsplash.com/photo-1552664730-d307ca884978?w=60&h=60&fit=crop&crop=center', userAdded:false },
+            { id:6, title:'Software Intern', company:'StartUp Hub', location:'San Francisco', type:'Internship', salary:'25,000 USD/yr', category:'Internship & Freshers', desc:'Hands-on experience in full-stack development with mentorship from senior engineers.', logo:'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=60&h=60&fit=crop&crop=center', userAdded:false },
+        ];
+
+        const CATEGORIES = ['Software & IT','Marketing & Sales','Finance & Accounting','Design & Creative','HR & Administration','Internship & Freshers'];
+        const TYPES = ['Full Time','Part Time','Internship'];
+        const CAT_ICONS = { 'Software & IT':'fa-laptop-code','Marketing & Sales':'fa-bullhorn','Finance & Accounting':'fa-chart-line','Design & Creative':'fa-palette','HR & Administration':'fa-users','Internship & Freshers':'fa-graduation-cap' };
+
+        // ── Toasts ──
+        const ToastCtx = createContext(() => {});
+        function ToastProvider({ children }) {
+            const [toasts, set] = useState([]);
+            const add = useCallback((msg, type='success') => {
+                const id = Date.now();
+                set(p => [...p, { id, msg, type, out:false }]);
+                setTimeout(() => { set(p => p.map(t => t.id===id ? {...t, out:true} : t)); setTimeout(() => set(p => p.filter(t => t.id!==id)), 250); }, 2500);
+            }, []);
+            return (
+                <ToastCtx.Provider value={add}>
+                    {children}
+                    <div className="fixed top-4 right-4 z-[999] flex flex-col gap-2" style={{maxWidth:'340px'}}>
+                        {toasts.map(t => (
+                            <div key={t.id} className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium ${t.out?'toast-exit':'toast-enter'}
+                                ${t.type==='success'?'bg-emerald-600':t.type==='error'?'bg-red-600':'bg-sky-600'}`}>
+                                <i className={`fa-solid ${t.type==='success'?'fa-check-circle':t.type==='error'?'fa-times-circle':'fa-info-circle'}`}></i>
+                                {t.msg}
+                            </div>
+                        ))}
+                    </div>
+                </ToastCtx.Provider>
+            );
+        }
+
+        // ── Navbar ──
+        function Navbar({ dark, toggleDark, bookmarkCount, mobileOpen, setMobileOpen }) {
+            const [scrolled, setScrolled] = useState(false);
+            useEffect(() => {
+                const fn = () => setScrolled(window.scrollY > 30);
+                window.addEventListener('scroll', fn, {passive:true});
+                return () => window.removeEventListener('scroll', fn);
+            }, []);
+            const links = ['Home','Jobs','Companies','About','Contact'];
+            return (
+                <header className={`fixed top-0 left-0 right-0 z-50 transition-shadow ${scrolled?'shadow-md':'shadow-none'}
+                    ${dark ? (scrolled?'bg-slate-900/90':'bg-slate-900/60') : (scrolled?'bg-white/90':'bg-white/60')}
+                    backdrop-blur-md`}>
+                    <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-14">
+                        <a href="#" className="flex items-center gap-2 no-underline">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center">
+                                <i className="fa-solid fa-briefcase text-white text-xs"></i>
+                            </div>
+                            <span className={`font-heading font-bold text-lg ${dark?'text-white':'text-gray-900'}`}>CareerConnect</span>
+                        </a>
+                        <nav className="hidden md:flex items-center gap-1">
+                            {links.map(l => (
+                                <a key={l} href={`#${l.toLowerCase()}`} className={`px-3 py-1.5 rounded-lg text-sm font-medium no-underline transition-colors
+                                    ${dark?'text-gray-300 hover:text-white hover:bg-white/10':'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}>{l}</a>
+                            ))}
+                        </nav>
+                        <div className="flex items-center gap-1">
+                            <button onClick={() => document.getElementById('jobs')?.scrollIntoView({behavior:'smooth'})}
+                                className={`relative p-2 rounded-lg transition-colors ${dark?'text-gray-400 hover:bg-white/10':'text-gray-500 hover:bg-gray-100'}`} aria-label="Bookmarks">
+                                <i className="fa-solid fa-bookmark text-sm"></i>
+                                {bookmarkCount > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-amber-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{bookmarkCount}</span>}
+                            </button>
+                            <button onClick={toggleDark} className={`p-2 rounded-lg transition-colors ${dark?'text-gray-400 hover:bg-white/10':'text-gray-500 hover:bg-gray-100'}`} aria-label="Toggle theme">
+                                <i className={`fa-solid ${dark?'fa-sun':'fa-moon'} text-sm`}></i>
+                            </button>
+                            <button onClick={() => setMobileOpen(!mobileOpen)} className={`md:hidden p-2 rounded-lg transition-colors ${dark?'text-gray-400 hover:bg-white/10':'text-gray-500 hover:bg-gray-100'}`} aria-label="Menu">
+                                <i className={`fa-solid ${mobileOpen?'fa-xmark':'fa-bars'} text-sm`}></i>
+                            </button>
+                        </div>
+                    </div>
+                    {mobileOpen && (
+                        <nav className={`md:hidden border-t px-4 pb-3 pt-2 flex flex-col gap-1 ${dark?'bg-slate-900/95 border-slate-800':'bg-white/95 border-gray-200'}`}>
+                            {links.map(l => (
+                                <a key={l} href={`#${l.toLowerCase()}`} onClick={() => setMobileOpen(false)}
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium no-underline ${dark?'text-gray-300 hover:bg-white/10':'text-gray-600 hover:bg-gray-100'}`}>{l}</a>
+                            ))}
+                        </nav>
+                    )}
+                </header>
+            );
+        }
+
+        // ── Hero ──
+        function Hero({ dark, query, setQuery, cat, setCat, type, setType, jobCount }) {
+            return (
+                <section id="home" className="pt-24 pb-12 px-4">
+                    <div className="max-w-3xl mx-auto text-center">
+                        <h1 className="font-heading font-extrabold text-4xl sm:text-5xl text-emerald-600 mb-3">Find Your Dream Job</h1>
+                        <p className={`text-base sm:text-lg mb-8 ${dark?'text-gray-400':'text-gray-500'}`}>Search, apply, and connect with top companies. Built for students and professionals.</p>
+                        {/* Search */}
+                        <div className={`flex items-center gap-2 p-2 rounded-xl border mb-4 ${dark?'bg-slate-800 border-slate-700':'bg-white border-gray-200'} shadow`}>
+                            <i className={`fa-solid fa-search pl-3 ${dark?'text-gray-500':'text-gray-400'}`}></i>
+                            <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search by title, skill, or company..."
+                                className={`flex-1 bg-transparent border-none outline-none py-2.5 px-2 text-sm ${dark?'text-white placeholder-gray-500':'text-gray-900 placeholder-gray-400'}`} aria-label="Search jobs" />
+                            <button className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors">Search</button>
+                        </div>
+                        {/* Category chips */}
+                        <div className="flex flex-wrap justify-center gap-2 mb-3">
+                            <button onClick={() => setCat(null)} className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors
+                                ${!cat ? 'bg-emerald-600 text-white border-emerald-600' : dark?'text-gray-400 border-slate-600 hover:border-emerald-500':'text-gray-500 border-gray-300 hover:border-emerald-400'}`}>All</button>
+                            {CATEGORIES.map(c => (
+                                <button key={c} onClick={() => setCat(cat===c?null:c)} className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors
+                                    ${cat===c ? 'bg-emerald-600 text-white border-emerald-600' : dark?'text-gray-400 border-slate-600 hover:border-emerald-500':'text-gray-500 border-gray-300 hover:border-emerald-400'}`}>
+                                    <i className={`fa-solid ${CAT_ICONS[c]} mr-1`}></i>{c}
+                                </button>
+                            ))}
+                        </div>
+                        {/* Type chips */}
+                        <div className="flex flex-wrap justify-center gap-2 mb-6">
+                            {TYPES.map(t => (
+                                <button key={t} onClick={() => setType(type===t?null:t)} className={`px-3 py-1 rounded-full text-xs font-medium transition-colors
+                                    ${type===t ? 'bg-amber-500 text-white' : dark?'bg-slate-800 text-gray-400 hover:bg-slate-700':'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{t}</button>
+                            ))}
+                            {type && <button onClick={() => setType(null)} className="px-2 py-1 text-xs text-red-400 hover:text-red-500"><i className="fa-solid fa-xmark mr-1"></i>Clear</button>}
+                        </div>
+                        <p className={`text-sm ${dark?'text-gray-600':'text-gray-400'}`}>{jobCount} job{jobCount!==1?'s':''} available</p>
+                    </div>
+                </section>
+            );
+        }
+
+        // ── Job Card ──
+        function JobCard({ job, dark, onRemove, onApply, onBookmark, saved }) {
+            const [show, setShow] = useState(false);
+            const [confirmDel, setConfirmDel] = useState(false);
+            return (
+                <div className={`rounded-xl border p-4 transition-shadow hover:shadow-md
+                    ${dark?'bg-slate-800 border-slate-700':'bg-white border-gray-200'}`}>
+                    <div className="flex items-start gap-3 mb-2">
+                        <img src={job.logo} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" loading="lazy" />
+                        <div className="flex-1 min-w-0">
+                            <h3 className={`font-heading font-semibold text-base leading-tight ${dark?'text-white':'text-gray-900'}`}>{job.title}</h3>
+                            <p className={`text-xs ${dark?'text-gray-400':'text-gray-500'}`}>{job.company}</p>
+                        </div>
+                        <button onClick={() => onBookmark(job.id)} className={`p-1.5 rounded transition-colors ${saved?'text-amber-500':dark?'text-gray-600 hover:text-amber-400':'text-gray-300 hover:text-amber-500'}`} aria-label="Bookmark">
+                            <i className={`fa-${saved?'solid':'regular'} fa-bookmark text-sm`}></i>
+                        </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium ${dark?'bg-slate-700 text-gray-300':'bg-gray-100 text-gray-600'}`}>
+                            <i className="fa-solid fa-location-dot text-[9px]"></i>{job.location}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-medium
+                            ${job.type==='Full Time'?'bg-emerald-100 text-emerald-700':job.type==='Part Time'?'bg-sky-100 text-sky-700':'bg-amber-100 text-amber-700'}`}>{job.type}</span>
+                        {job.salary && <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium ${dark?'bg-slate-700 text-gray-300':'bg-gray-100 text-gray-600'}`}><i className="fa-solid fa-dollar-sign text-[9px]"></i>{job.salary}</span>}
+                    </div>
+                    <div className={`overflow-hidden transition-all duration-200 ${show?'max-h-32 opacity-100 mb-2':'max-h-0 opacity-0'}`}>
+                        <p className={`text-xs leading-relaxed ${dark?'text-gray-400':'text-gray-500'}`}>{job.desc}</p>
+                    </div>
+                    <button onClick={() => setShow(!show)} className={`text-xs font-medium mb-2 ${dark?'text-emerald-400':'text-emerald-600'}`}>{show?'Show less':'Show more'}</button>
+                    {confirmDel && (
+                        <div className="flex items-center gap-2 mb-2 p-2 rounded-lg bg-red-50 border border-red-200 text-xs">
+                            <span className="text-red-600 flex-1">Remove this job?</span>
+                            <button onClick={() => { onRemove(job.id); setConfirmDel(false); }} className="px-2.5 py-1 bg-red-600 text-white rounded font-medium">Yes</button>
+                            <button onClick={() => setConfirmDel(false)} className="px-2.5 py-1 bg-gray-200 text-gray-700 rounded font-medium">No</button>
+                        </div>
+                    )}
+                    <div className="flex gap-2">
+                        <button onClick={() => onApply(job)} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors">Apply Now</button>
+                        {job.userAdded && (
+                            <button onClick={() => setConfirmDel(true)} className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm rounded-lg transition-colors border border-red-200" aria-label="Delete">
+                                <i className="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // ── Job Listings ──
+        function JobListings({ dark, jobs, onRemove, onApply, bookmarks, onBookmark, showSaved, setShowSaved }) {
+            const list = showSaved ? jobs.filter(j => bookmarks.has(j.id)) : jobs;
+            return (
+                <section id="jobs" className="px-4 pb-10">
+                    <div className="max-w-6xl mx-auto">
+                        <div className="flex items-center justify-between mb-5">
+                            <div>
+                                <h2 className={`font-heading font-bold text-xl ${dark?'text-white':'text-gray-900'}`}>Latest Job Openings</h2>
+                                <p className={`text-xs mt-0.5 ${dark?'text-gray-500':'text-gray-400'}`}>{list.length} {showSaved?'bookmarked ':''}job{list.length!==1?'s':''}</p>
+                            </div>
+                            <button onClick={() => setShowSaved(!showSaved)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors
+                                    ${showSaved ? 'bg-amber-500 text-white border-amber-500' : dark?'border-slate-700 text-gray-400 hover:border-amber-500':'border-gray-200 text-gray-500 hover:border-amber-400'}`}>
+                                <i className={`fa-${showSaved?'solid':'regular'} fa-bookmark`}></i>{showSaved?'Show All':'Bookmarked'}
+                            </button>
+                        </div>
+                        {list.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {list.map(j => <JobCard key={j.id} job={j} dark={dark} onRemove={onRemove} onApply={onApply} onBookmark={onBookmark} saved={bookmarks.has(j.id)} />)}
+                            </div>
+                        ) : (
+                            <div className={`text-center py-14 rounded-xl border-2 border-dashed ${dark?'border-slate-700':'border-gray-300'}`}>
+                                <i className={`fa-solid fa-briefcase text-4xl mb-3 ${dark?'text-slate-700':'text-gray-300'}`}></i>
+                                <p className={`font-medium ${dark?'text-gray-500':'text-gray-400'}`}>{showSaved?'No bookmarked jobs':'No jobs match your filters'}</p>
+                                {!showSaved && <button onClick={() => window.dispatchEvent(new Event('clearFilters'))} className="mt-2 text-sm text-emerald-600 hover:text-emerald-700 font-medium">Clear filters</button>}
+                            </div>
+                        )}
+                    </div>
+                </section>
+            );
+        }
+
+        // ── Add Job ──
+        function AddJob({ dark, onAdd }) {
+            const [open, setOpen] = useState(false);
+            const [f, setF] = useState({title:'',company:'',location:'',type:'',salary:'',category:'',desc:''});
+            const [errs, setErrs] = useState({});
+            const toast = useContext(ToastCtx);
+
+            const save = () => {
+                const e = {};
+                if(!f.title.trim()) e.title='Required';
+                if(!f.company.trim()) e.company='Required';
+                if(!f.location.trim()) e.location='Required';
+                if(!f.type) e.type='Required';
+                if(!f.salary.trim()) e.salary='Required';
+                if(!f.category) e.category='Required';
+                if(!f.desc.trim()) e.desc='Required';
+                setErrs(e);
+                if(Object.keys(e).length) { toast('Fill in all fields','error'); return; }
+                onAdd({...f, id:Date.now(), userAdded:true, logo:'https://images.unsplash.com/photo-1552664730-d307ca884978?w=60&h=60&fit=crop&crop=center'});
+                setF({title:'',company:'',location:'',type:'',salary:'',category:'',desc:''});
+                setErrs({});
+                setOpen(false);
+                toast('Job posted!');
+            };
+            const up = (k,v) => { setF(p=>({...p,[k]:v})); if(errs[k]) setErrs(p=>{const n={...p};delete n[k];return n;}); };
+            const cls = (k) => `w-full px-3 py-2.5 rounded-lg border text-sm outline-none transition-colors
+                ${errs[k]?'border-red-400':dark?'border-slate-600 bg-slate-700 text-white placeholder-gray-500':'border-gray-300 bg-white text-gray-900 placeholder-gray-400'}`;
+
+            return (
+                <section className="px-4 pb-10">
+                    <div className="max-w-2xl mx-auto">
+                        <h2 className={`font-heading font-bold text-xl mb-1 ${dark?'text-white':'text-gray-900'}`}>Add a New Job</h2>
+                        <p className={`text-xs mb-4 ${dark?'text-gray-500':'text-gray-400'}`}>Post an open position for candidates.</p>
+                        {!open ? (
+                            <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors">
+                                <i className="fa-solid fa-plus text-xs"></i> Add New Job
+                            </button>
+                        ) : (
+                            <div className={`p-5 rounded-xl border ${dark?'bg-slate-800 border-slate-700':'bg-white border-gray-200'} shadow-lg`}>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                                    <div><label className={`block text-xs font-medium mb-1 ${dark?'text-gray-400':'text-gray-500'}`}>Job Title</label><input value={f.title} onChange={e=>up('title',e.target.value)} placeholder="Frontend Developer" className={cls('title')}/>{errs.title&&<p className="text-red-500 text-[11px] mt-0.5">{errs.title}</p>}</div>
+                                    <div><label className={`block text-xs font-medium mb-1 ${dark?'text-gray-400':'text-gray-500'}`}>Company</label><input value={f.company} onChange={e=>up('company',e.target.value)} placeholder="Acme Corp" className={cls('company')}/>{errs.company&&<p className="text-red-500 text-[11px] mt-0.5">{errs.company}</p>}</div>
+                                    <div><label className={`block text-xs font-medium mb-1 ${dark?'text-gray-400':'text-gray-500'}`}>Location</label><input value={f.location} onChange={e=>up('location',e.target.value)} placeholder="Remote, NYC" className={cls('location')}/>{errs.location&&<p className="text-red-500 text-[11px] mt-0.5">{errs.location}</p>}</div>
+                                    <div><label className={`block text-xs font-medium mb-1 ${dark?'text-gray-400':'text-gray-500'}`}>Type</label><select value={f.type} onChange={e=>up('type',e.target.value)} className={cls('type')}><option value="">Select</option>{TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select>{errs.type&&<p className="text-red-500 text-[11px] mt-0.5">{errs.type}</p>}</div>
+                                    <div><label className={`block text-xs font-medium mb-1 ${dark?'text-gray-400':'text-gray-500'}`}>Salary</label><input value={f.salary} onChange={e=>up('salary',e.target.value)} placeholder="80,000 USD/yr" className={cls('salary')}/>{errs.salary&&<p className="text-red-500 text-[11px] mt-0.5">{errs.salary}</p>}</div>
+                                    <div><label className={`block text-xs font-medium mb-1 ${dark?'text-gray-400':'text-gray-500'}`}>Category</label><select value={f.category} onChange={e=>up('category',e.target.value)} className={cls('category')}><option value="">Select</option>{CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}</select>{errs.category&&<p className="text-red-500 text-[11px] mt-0.5">{errs.category}</p>}</div>
+                                </div>
+                                <div className="mb-3"><label className={`block text-xs font-medium mb-1 ${dark?'text-gray-400':'text-gray-500'}`}>Description</label><textarea value={f.desc} onChange={e=>up('desc',e.target.value)} rows="2" placeholder="Role details..." className={`${cls('desc')} resize-none`}/>{errs.desc&&<p className="text-red-500 text-[11px] mt-0.5">{errs.desc}</p>}</div>
+                                <div className="flex gap-2">
+                                    <button onClick={save} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors">Save</button>
+                                    <button onClick={() => { setOpen(false); setErrs({}); }} className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-semibold rounded-lg transition-colors">Cancel</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </section>
+            );
+        }
+
+        // ── Categories ──
+        function Categories({ dark, cat, setCat }) {
+            return (
+                <section id="companies" className="px-4 pb-10">
+                    <div className="max-w-6xl mx-auto">
+                        <h2 className={`font-heading font-bold text-xl mb-1 text-center ${dark?'text-white':'text-gray-900'}`}>Popular Categories</h2>
+                        <p className={`text-xs text-center mb-5 ${dark?'text-gray-500':'text-gray-400'}`}>Browse by your field of interest</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                            {CATEGORIES.map(c => (
+                                <button key={c} onClick={() => setCat(cat===c?null:c)}
+                                    className={`p-4 rounded-xl border text-center transition-all hover:-translate-y-0.5
+                                        ${cat===c ? 'bg-emerald-600 border-emerald-600 text-white shadow-md' : dark?'bg-slate-800 border-slate-700 text-gray-300 hover:border-emerald-500/50':'bg-white border-gray-200 text-gray-700 hover:border-emerald-300'}`}>
+                                    <i className={`fa-solid ${CAT_ICONS[c]} text-lg mb-2 block ${cat===c?'text-white':dark?'text-emerald-400':'text-emerald-600'}`}></i>
+                                    <span className="text-xs font-semibold block leading-tight">{c}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+            );
+        }
+
+        // ── Why / About / Contact combined ──
+        function InfoSections({ dark }) {
+            const toast = useContext(ToastCtx);
+            const [contact, setContact] = useState({name:'',email:'',msg:''});
+            const sendMsg = (e) => {
+                e.preventDefault();
+                if(!contact.name.trim()||!contact.email.trim()||!contact.msg.trim()) { toast('Fill in all fields','error'); return; }
+                toast('Message sent!'); setContact({name:'',email:'',msg:''});
+            };
+            const inp = `w-full px-3 py-2 rounded-lg border text-sm outline-none transition-colors ${dark?'border-slate-600 bg-slate-700 text-white placeholder-gray-500':'border-gray-300 bg-white text-gray-900 placeholder-gray-400'}`;
+            const features = [
+                {icon:'fa-bolt',t:'Easy Search & Apply',d:'Find and apply for jobs in minutes.'},
+                {icon:'fa-shield-halved',t:'Trusted Companies',d:'Verified employers, reliable opportunities.'},
+                {icon:'fa-layer-group',t:'All Career Stages',d:'Roles for freshers and experienced pros.'},
+                {icon:'fa-gift',t:'Free for Seekers',d:'No hidden fees. Start for free.'},
+            ];
+            return (
+                <>
+                    <section id="about" className="px-4 pb-10">
+                        <div className="max-w-5xl mx-auto">
+                            <h2 className={`font-heading font-bold text-xl mb-4 ${dark?'text-white':'text-gray-900'}`}>Why CareerConnect?</h2>
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                {features.map((f,i) => (
+                                    <div key={i} className={`p-4 rounded-xl border ${dark?'bg-slate-800 border-slate-700':'bg-white border-gray-200'}`}>
+                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${dark?'bg-emerald-900/40 text-emerald-400':'bg-emerald-50 text-emerald-600'}`}>
+                                            <i className={`fa-solid ${f.icon}`}></i>
+                                        </div>
+                                        <h3 className={`font-heading font-semibold text-sm mb-1 ${dark?'text-white':'text-gray-900'}`}>{f.t}</h3>
+                                        <p className={`text-xs leading-relaxed ${dark?'text-gray-400':'text-gray-500'}`}>{f.d}</p>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className={`mt-6 p-5 rounded-xl border ${dark?'bg-slate-800 border-slate-700':'bg-white border-gray-200'}`}>
+                                <h2 className={`font-heading font-bold text-xl mb-2 ${dark?'text-white':'text-gray-900'}`}>About CareerConnect</h2>
+                                <p className={`text-sm leading-relaxed ${dark?'text-gray-400':'text-gray-500'}`}>CareerConnect is a student-friendly job portal designed to connect job seekers with employers. Our goal is to make job searching simple, fast, and accessible for everyone — whether you're a fresher or an experienced professional.</p>
+                            </div>
+                        </div>
+                    </section>
+                    <section id="contact" className="px-4 pb-10">
+                        <div className="max-w-3xl mx-auto">
+                            <div className={`p-5 rounded-xl border ${dark?'bg-slate-800 border-slate-700':'bg-white border-gray-200'}`}>
+                                <h2 className={`font-heading font-bold text-xl mb-1 ${dark?'text-white':'text-gray-900'}`}>Contact Us</h2>
+                                <p className={`text-xs mb-4 ${dark?'text-gray-500':'text-gray-400'}`}>Questions? Drop us a message.</p>
+                                <div className={`flex flex-wrap gap-4 mb-5 pb-4 border-b ${dark?'border-slate-700':'border-gray-200'}`}>
+                                    <span className={`text-sm ${dark?'text-gray-300':'text-gray-600'}`}><i className="fa-solid fa-envelope mr-1.5 text-emerald-600"></i>support@careerconnect.com</span>
+                                    <span className={`text-sm ${dark?'text-gray-300':'text-gray-600'}`}><i className="fa-solid fa-phone mr-1.5 text-emerald-600"></i>+91 98765 43210</span>
+                                    <span className={`text-sm ${dark?'text-gray-300':'text-gray-600'}`}><i className="fa-solid fa-location-dot mr-1.5 text-emerald-600"></i>India</span>
+                                </div>
+                                <form onSubmit={sendMsg} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <input value={contact.name} onChange={e=>setContact(p=>({...p,name:e.target.value}))} placeholder="Your name" className={inp} />
+                                    <input value={contact.email} onChange={e=>setContact(p=>({...p,email:e.target.value}))} placeholder="Your email" className={inp} />
+                                    <textarea value={contact.msg} onChange={e=>setContact(p=>({...p,msg:e.target.value}))} rows="2" placeholder="Your message" className={`${inp} sm:col-span-2 resize-none`} />
+                                    <button type="submit" className="sm:col-span-2 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors">Send Message</button>
+                                </form>
+                            </div>
+                        </div>
+                    </section>
+                </>
+            );
+        }
+
+        // ── Apply Modal ──
+        function ApplyModal({ job, dark, onClose }) {
+            const toast = useContext(ToastCtx);
+            const [f, setF] = useState({name:'',email:'',phone:''});
+            const [errs, setErrs] = useState({});
+            if(!job) return null;
+            const submit = () => {
+                const e = {};
+                if(!f.name.trim()) e.name='Required';
+                if(!f.email.trim()||!/\S+@\S+\.\S+/.test(f.email)) e.email='Valid email required';
+                if(!f.phone.trim()) e.phone='Required';
+                setErrs(e);
+                if(Object.keys(e).length) { toast('Fix the errors','error'); return; }
+                toast(`Applied to ${job.title} at ${job.company}!`);
+                onClose();
+            };
+            const up = (k,v) => { setF(p=>({...p,[k]:v})); if(errs[k]) setErrs(p=>{const n={...p};delete n[k];return n;}); };
+            const cls = (k) => `w-full px-3 py-2.5 rounded-lg border text-sm outline-none ${errs[k]?'border-red-400':dark?'border-slate-600 bg-slate-700 text-white placeholder-gray-500':'border-gray-300 bg-white text-gray-900 placeholder-gray-400'}`;
+            return (
+                <div className="modal-bg fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={onClose}>
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+                    <div className="modal-box relative w-full max-w-md rounded-xl border shadow-2xl overflow-hidden" onClick={e=>e.stopPropagation()}
+                        style={{background: dark?'#1e293b':'#fff', borderColor: dark?'#334155':'#e5e7eb'}}>
+                        <div className="p-5">
+                            <div className="flex items-start justify-between mb-4">
+                                <div>
+                                    <h3 className={`font-heading font-bold text-lg ${dark?'text-white':'text-gray-900'}`}>Apply</h3>
+                                    <p className={`text-xs mt-0.5 ${dark?'text-gray-400':'text-gray-500'}`}>{job.title} — <span className="text-emerald-600">{job.company}</span></p>
+                                </div>
+                                <button onClick={onClose} className={`p-1.5 rounded-lg ${dark?'hover:bg-slate-700 text-gray-400':'hover:bg-gray-100 text-gray-500'}`}><i className="fa-solid fa-xmark"></i></button>
+                            </div>
+                            <div className="space-y-3">
+                                <div><label className={`block text-xs font-medium mb-1 ${dark?'text-gray-400':'text-gray-500'}`}>Name</label><input value={f.name} onChange={e=>up('name',e.target.value)} className={cls('name')}/>{errs.name&&<p className="text-red-500 text-[11px] mt-0.5">{errs.name}</p>}</div>
+                                <div><label className={`block text-xs font-medium mb-1 ${dark?'text-gray-400':'text-gray-500'}`}>Email</label><input value={f.email} onChange={e=>up('email',e.target.value)} className={cls('email')}/>{errs.email&&<p className="text-red-500 text-[11px] mt-0.5">{errs.email}</p>}</div>
+                                <div><label className={`block text-xs font-medium mb-1 ${dark?'text-gray-400':'text-gray-500'}`}>Phone</label><input value={f.phone} onChange={e=>up('phone',e.target.value)} className={cls('phone')}/>{errs.phone&&<p className="text-red-500 text-[11px] mt-0.5">{errs.phone}</p>}</div>
+                            </div>
+                            <div className="flex gap-2 mt-5">
+                                <button onClick={submit} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors">Submit</button>
+                                <button onClick={onClose} className="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-semibold rounded-lg transition-colors">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ── Footer ──
+        function Footer({ dark }) {
+            return (
+                <footer className={`border-t ${dark?'bg-slate-900 border-slate-800':'bg-gray-50 border-gray-200'}`}>
+                    <div className="max-w-6xl mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <p className={`text-xs ${dark?'text-gray-600':'text-gray-400'}`}>&copy; 2026 CareerConnect. All Rights Reserved.</p>
+                        <div className="flex gap-4">
+                            <a href="#" className={`text-xs no-underline ${dark?'text-gray-500 hover:text-emerald-400':'text-gray-400 hover:text-emerald-600'}`}>Privacy Policy</a>
+                            <a href="#" className={`text-xs no-underline ${dark?'text-gray-500 hover:text-emerald-400':'text-gray-400 hover:text-emerald-600'}`}>Terms & Conditions</a>
+                            <a href="#" className={`text-xs no-underline ${dark?'text-gray-500 hover:text-emerald-400':'text-gray-400 hover:text-emerald-600'}`}>Help</a>
+                        </div>
+                    </div>
+                </footer>
+            );
+        }
+
+        // ── App ──
+        function App() {
+            const [dark, setDark] = useState(() => localStorage.getItem('cc-dark')==='true');
+            const [jobs, setJobs] = useState(() => { const s=localStorage.getItem('cc-jobs'); return s?JSON.parse(s):INITIAL_JOBS; });
+            const [bookmarks, setBookmarks] = useState(() => { const s=localStorage.getItem('cc-bm'); return s?new Set(JSON.parse(s)):new Set(); });
+            const [query, setQuery] = useState('');
+            const [cat, setCat] = useState(null);
+            const [type, setType] = useState(null);
+            const [showSaved, setShowSaved] = useState(false);
+            const [modal, setModal] = useState(null);
+            const [mobileOpen, setMobileOpen] = useState(false);
+
+            useEffect(() => { localStorage.setItem('cc-dark',dark); }, [dark]);
+            useEffect(() => { localStorage.setItem('cc-jobs',JSON.stringify(jobs)); }, [jobs]);
+            useEffect(() => { localStorage.setItem('cc-bm',JSON.stringify([...bookmarks])); }, [bookmarks]);
+            useEffect(() => { document.documentElement.classList.toggle('dark',dark); }, [dark]);
+            useEffect(() => {
+                const h = () => { setQuery(''); setCat(null); setType(null); setShowSaved(false); };
+                window.addEventListener('clearFilters',h);
+                return () => window.removeEventListener('clearFilters',h);
+            }, []);
+            useEffect(() => { const h = e => { if(e.key==='Escape') setModal(null); }; window.addEventListener('keydown',h); return () => window.removeEventListener('keydown',h); }, []);
+
+            const filtered = useMemo(() => jobs.filter(j => {
+                const q = query.toLowerCase();
+                if(q && !j.title.toLowerCase().includes(q) && !j.company.toLowerCase().includes(q) && !j.desc.toLowerCase().includes(q) && !j.category.toLowerCase().includes(q)) return false;
+                if(cat && j.category!==cat) return false;
+                if(type && j.type!==type) return false;
+                return true;
+            }), [jobs, query, cat, type]);
+
+            return (
+                <div className={`min-h-screen transition-colors duration-200 ${dark?'bg-[#0B1120]':'bg-[#FAFAF5]'}`}>
+                    <Navbar dark={dark} toggleDark={()=>setDark(p=>!p)} bookmarkCount={bookmarks.size} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+                    <Hero dark={dark} query={query} setQuery={setQuery} cat={cat} setCat={setCat} type={type} setType={setType} jobCount={filtered.length} />
+                    <JobListings dark={dark} jobs={filtered} onRemove={id=>{setJobs(p=>p.filter(j=>j.id!==id));setBookmarks(p=>{const n=new Set(p);n.delete(id);return n;});}}
+                        onApply={setModal} bookmarks={bookmarks} onBookmark={id=>setBookmarks(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;})}
+                        showSaved={showSaved} setShowSaved={setShowSaved} />
+                    <AddJob dark={dark} onAdd={j=>setJobs(p=>[j,...p])} />
+                    <Categories dark={dark} cat={cat} setCat={setCat} />
+                    <InfoSections dark={dark} />
+                    <Footer dark={dark} />
+                    {modal && <ApplyModal job={modal} dark={dark} onClose={()=>setModal(null)} />}
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<ToastProvider><App /></ToastProvider>);
+    </script>
+</body>
+</html>
